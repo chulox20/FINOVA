@@ -5,201 +5,129 @@
 
 ---
 
-## 🚀 Tecnologías & Stack
+## 🏛️ Arquitectura del Sistema
 
-- **Frontend**:
-  - React 18 / 19 + Vite
-  - Tailwind CSS + PostCSS + Autoprefixer
-  - Lucide React (iconografía moderna y consistente)
-  - Framer Motion (animaciones y micro-interacciones)
-  - Recharts (gráficos responsivos: Ingresos vs Gastos, Donut de categorías, Evolución del balance)
-  - React Hook Form + Zod (validación de esquemas y formularios accesibles)
-  - Date-fns (cálculos y formateos de fechas en español)
-  - Canvas Confetti (celebración al completar metas de ahorro)
-- **Backend & Database**:
-  - Supabase
-  - PostgreSQL con Row Level Security (RLS)
-  - Supabase Auth (Email + Contraseña, Google OAuth, Recuperación de contraseña)
-  - Procedimientos almacenados y Triggers en PostgreSQL (cálculo de balances, aportes a metas y creación de perfiles)
-- **Modo Demo Offline Instantáneo**:
-  - Si no se configuran credenciales de Supabase en `.env`, FINOVA se ejecuta automáticamente en **Modo Demo Local**, permitiendo explorar todas las funcionalidades inmediatamente con datos iniciales ricos y realistas.
-
----
-
-## 📋 Características Principales
-
-### 1. 🏠 Landing Page (`/`)
-- Hero moderno: *"Tu dinero. Más claro que nunca."*
-- Vista previa interactiva con balance total ($12,480.50), ingresos (+$4,250.00), gastos (-$2,130.00) y ahorro neto ($2,120.00).
-- Beneficios clave y garantía de privacidad.
-- Acceso directo para registrarse o probar la demo.
-
-### 2. 🔐 Autenticación (`/login`, `/register`, `/forgot-password`)
-- Registro con Nombre, Email y Contraseña (rol por defecto: `user`).
-- Inicio de sesión con Email, Contraseña, Recordarme y Google.
-- **Acceso rápido con 1-Click a modo demo:**
-  - 👤 **Jesús (Usuario)**
-  - 🛡️ **Admin Finova**
-- Recuperación de contraseña por correo.
-
-### 3. 📊 Dashboard Principal (`/dashboard`)
-- Saludo personalizado: *"Hola, Jesús 👋"*
-- Balance total consolidado con selector de período: **Este mes**, **Últimos 3 meses**, **Este año**.
-- **4 Tarjetas KPI con variación porcentual:**
-  1. Ingresos: `+$4,250.00` (`+8.2%`)
-  2. Gastos: `-$2,130.00` (`-4.3%`)
-  3. Ahorro Neto: `$2,120.00` (`+12.7%`)
-  4. Presupuesto utilizado: `68%` con barra de progreso interactiva.
-- **Gráfica Principal (Recharts AreaChart):** Ingresos vs Gastos mensuales con área de diferencia y gradientes.
-- **Gráfica de Gastos por Categoría (Recharts Donut):** Vivienda 35%, Alimentación 20%, Transporte 15%, etc.
-- **Tabla de Últimos Movimientos:** con badges de tipo, píldoras de categoría y montos coloreados.
-- **Alertas de presupuesto en tiempo real:** Avisos al superar el 80% o 100% de una categoría.
-
-### 4. 💳 Cuentas Financieras (`/accounts`)
-- Creación y edición de cuentas de todo tipo:
-  - `checking` (Cuenta Corriente)
-  - `savings` (Cuenta de Ahorros)
-  - `cash` (Efectivo / Billetera)
-  - `credit_card` (Tarjeta de Crédito)
-  - `investment` (Inversión)
-- Balance inicial, moneda, color personalizado e icono.
-- Modal de **Transferencia entre Cuentas** que sincroniza ambos saldos automáticamente.
-
-### 5. 🔁 Movimientos & Transacciones (`/transactions`)
-- Listado completo de transacciones.
-- **Filtros avanzados:**
-  - Búsqueda por descripción o notas.
-  - Filtro por tipo (Ingreso, Gasto, Transferencia).
-  - Filtro por categoría.
-  - Filtro por cuenta de origen/destino.
-  - Rango de fechas (Desde / Hasta).
-  - Rango de montos (Mín / Máx).
-- **Exportación a CSV:** Genera y descarga el archivo `finova-movimientos.csv` (`fecha,descripcion,categoria,tipo,monto,notas`).
-- Modal de creación y edición con validaciones Zod.
-
-### 6. 🏷️ Categorías (`/categories`)
-- Categorías predeterminadas del sistema:
-  - Vivienda, Alimentación, Transporte, Salud, Educación, Entretenimiento, Compras, Viajes, Servicios, Otros Gastos, Salario, Freelance, Inversiones, Otros Ingresos.
-- Creación de categorías personalizadas con paleta de colores y selector de iconos.
-
-### 7. 🥧 Presupuestos (`/budgets`)
-- Definición de presupuestos por categoría (ej. Alimentación $500, Transporte $250, Vivienda $900).
-- Cálculo en tiempo real de gastado vs límite vs disponible.
-- Barras de progreso visuales con estados dinámicos:
-  - 🟢 **Normal** (`<80%`)
-  - 🟡 **Cerca del límite** (`80% - 100%`)
-  - 🔴 **Excedido** (`>100%`)
-- Banner de alertas automáticas.
-
-### 8. 🎯 Metas de Ahorro (`/goals`)
-- Creación de objetivos de ahorro (ej. *Viaje a Japón $4,000*, *Fondo de emergencia $10,000*).
-- Modal **[ + Añadir ahorro ]**: permite realizar abonos parciales, vincular la cuenta origen y registrar notas.
-- Barra de progreso porcentual y conteo de días restantes.
-- Historial completo de aportes cronológicos por meta (`goal_contributions`).
-- Animación de confeti al completar una meta al 100%.
-
-### 9. 📈 Análisis Financiero (`/analytics`)
-- **Tasa de Ahorro**: Medidor circular con la fórmula `(Ingresos - Gastos) / Ingresos × 100`.
-- **Comparación Mensual**: Variaciones porcentuales de Este mes vs Mes anterior.
-- **Evolución 12 Meses**: Gráfico de área de ingresos vs gastos en el último año.
-- **Evolución del Balance Acumulado**: Gráfico de línea de patrimonio en el tiempo.
-- **Exportación de reportes CSV**.
-
-### 10. 📅 Calendario Financiero (`/calendar`)
-- Vista mensual interactiva de calendario.
-- Píldoras de ingresos y gastos diarios (ej. `22: -$82`, `21: +$3,500`).
-- Drawer modal al hacer clic en cualquier día con el desglose de transacciones y botón para agregar movimientos en esa fecha.
-
-### 11. 👤 Perfil & Preferencias (`/profile`)
-- Selector de foto de avatar.
-- Nombre, email y teléfono.
-- Selector de **Moneda Principal**: USD ($), EUR (€), VES (Bs.), GBP (£).
-- Preferencias de formato decimal (`dot` o `comma`) y día de inicio de semana (`Lunes` o `Domingo`).
-
-### 12. ⚙️ Configuración (`/settings`)
-- **Apariencia**: Claro (Light), Oscuro (Dark) y Sistema (Auto).
-- **Notificaciones**: Toggles para alertas de presupuesto, avisos de metas y resumen semanal.
-- **Seguridad**: Solicitud de cambio de contraseña por correo y estado de sesiones activas.
-- **Copia de seguridad**: Exportación completa de datos.
-
-### 13. 🛡️ Panel de Administración (`/admin`)
-- Restringido estrictamente a usuarios con rol `admin`.
-- Métricas agregadas del sistema (Usuarios registrados, Usuarios activos, Transacciones totales, Salud del servidor).
-- **Gestión de categorías predeterminadas**: Permite a los administradores crear, editar y eliminar categorías base para todos los usuarios.
-- **Privacidad estricta**: No expone transacciones financieras privadas de los usuarios.
-
----
-
-## 🗄️ Estructura de la Base de Datos (PostgreSQL)
-
-El archivo `supabase/schema.sql` contiene la definición completa de la base de datos:
-
-```sql
-profiles
-   │
-   ├── accounts ────── transactions
-   │
-   ├── categories ──── transactions
-   │         │
-   │         └──────── budget_categories
-   │
-   ├── budgets ─────── budget_categories
-   │
-   ├── goals ───────── goal_contributions
-   │
-   └── notifications
+```
+React + Vite (Frontend)
+       ↓
+REST API (JSON + JWT Bearer)
+       ↓
+Node.js + Express
+       ↓
+PostgreSQL (Transacciones ACID con pool 'pg')
 ```
 
-### Seguridad y RLS (Row Level Security)
-- Todas las tablas tienen RLS habilitado.
-- Los usuarios sólo pueden consultar y mutar registros donde `auth.uid() = user_id`.
-- Políticas de administrador protegidas mediante subconsulta de rol.
+### Seguridad y Tecnologías Clave:
+- **Autenticación**: JSON Web Tokens (JWT) + contraseñas cifradas con `bcryptjs`.
+- **Validación**: Esquemas rigurosos y tipados con `Zod` tanto en Frontend como en Backend.
+- **Protección**: `express-rate-limit` (10 intentos / 15 min en endpoints de autenticación, 200 req/min general).
+- **Control de Acceso (RBAC)**: Middleware de autenticación (`requireAuth`) y roles (`requireRole('admin')`).
+- **Integridad Financiera ACID**: PostgreSQL es la autoridad exclusiva de los balances. Todas las mutaciones de saldo, transferencias entre cuentas y abonos a metas se ejecutan en bloques transaccionales atómicos (`BEGIN ... COMMIT / ROLLBACK`).
 
 ---
 
-## 🛠️ Instalación y Ejecución Local
+## 📁 Estructura del Repositorio
 
-1. **Clonar el repositorio:**
+```
+FINOVA/
+│
+├── frontend/                     # React + Vite + Tailwind CSS + Recharts
+│   ├── src/
+│   │   ├── components/           # UI Kit, modales, gráficos y layouts
+│   │   ├── contexts/             # AuthContext (JWT), FinanceContext, ThemeContext
+│   │   ├── pages/                # Home, Dashboard, Accounts, Transactions, etc.
+│   │   ├── services/             # apiClient.js y conectores REST API
+│   │   ├── utils/                # Cálculos financieros, formateo de monedas y fechas
+│   │   └── styles/               # Directivas Tailwind y estilos globales
+│   ├── package.json
+│   └── vite.config.js
+│
+├── backend/                      # Node.js + Express + PostgreSQL REST API
+│   ├── src/
+│   │   ├── config/               # Validador estricto de variables de entorno con Zod
+│   │   ├── controllers/          # Controladores HTTP
+│   │   ├── db/                   # Pool de conexión, schema.sql, migrate.js y seed.js
+│   │   ├── middleware/           # authMiddleware, roleMiddleware, rateLimiter, errorHandler
+│   │   ├── routes/               # Rutas modulares montadas en /api
+│   │   ├── services/             # Lógica de negocio y transacciones PostgreSQL ACID
+│   │   ├── validators/           # Validadores Zod de solicitudes
+│   │   └── server.js             # Entrada del servidor Express
+│   ├── package.json
+│   └── .env.example
+│
+└── package.json                  # Scripts raíz para ejecución del monorepo
+```
+
+---
+
+## 🗄️ Modelo de Datos (PostgreSQL)
+
+Tablas principales definidas en `backend/src/db/schema.sql`:
+
+1. **`users`**: `id` (UUID), `full_name`, `email` (UNIQUE), `password_hash`, `avatar_url`, `role` (`user` / `admin`), `currency` (`USD`, `EUR`, `VES`, `GBP`), `last_seen_at`, `created_at`, `updated_at`.
+2. **`accounts`**: `id`, `user_id`, `name`, `type` (`checking`, `savings`, `cash`, `credit_card`, `investment`), `balance` (NUMERIC), `currency`, `color`, `icon`.
+3. **`categories`**: `id`, `user_id` (NULL para categorías base del sistema), `name`, `type` (`income`, `expense`, `both`), `color`, `icon`, `is_default`.
+4. **`transactions`**: `id`, `user_id`, `account_id`, `to_account_id` (transferencias), `category_id`, `type` (`income`, `expense`, `transfer`), `description`, `amount`, `transaction_date`, `notes`.
+5. **`budgets`**: `id`, `user_id`, `name`, `period` (`monthly`, `weekly`, `yearly`, `custom`), `amount`, `start_date`, `end_date`.
+6. **`budget_categories`**: `id`, `budget_id`, `category_id`, `limit_amount`.
+7. **`goals`**: `id`, `user_id`, `name`, `target_amount`, `current_amount`, `deadline`, `account_id`, `color`, `icon`, `status` (`active`, `completed`, `cancelled`).
+8. **`goal_contributions`**: `id`, `goal_id`, `user_id`, `amount`, `contribution_date`, `note`.
+9. **`notifications`**: `id`, `user_id`, `type` (`budget`, `goal`, `system`, `security`), `title`, `message`, `is_read`.
+
+---
+
+## 🚀 Instalación y Puesta en Marcha
+
+### 1. Clonar el repositorio
 ```bash
 git clone https://github.com/chulox20/FINOVA.git
 cd FINOVA
 ```
 
-2. **Instalar dependencias:**
+### 2. Configurar el Backend
 ```bash
+cd backend
+cp .env.example .env
 npm install
 ```
 
-3. **Configurar variables de entorno (Opcional si usas Supabase en la nube):**
-```bash
-cp .env.example .env
-```
-Edita `.env` con tus credenciales:
+Configura tu base de datos en `backend/.env`:
 ```env
-VITE_SUPABASE_URL=https://tu-proyecto.supabase.co
-VITE_SUPABASE_ANON_KEY=tu-clave-anon
+PORT=4000
+DATABASE_URL=postgresql://usuario:contraseña@localhost:5432/finova_db
+JWT_SECRET=tu_clave_secreta_jwt_minimo_16_caracteres
+FRONTEND_URL=http://localhost:5173
 ```
 
-> *Si no configuras `.env`, la aplicación funcionará automáticamente en Modo Demo Local con persistencia en LocalStorage.*
+Ejecutar migraciones y datos de prueba:
+```bash
+npm run migrate
+npm run seed
+```
 
-4. **Iniciar el servidor de desarrollo:**
+Iniciar el servidor de backend:
 ```bash
 npm run dev
 ```
 
-5. **Construir para producción:**
+### 3. Configurar el Frontend
+En otra terminal:
 ```bash
-npm run build
+cd ../frontend
+npm install
+npm run dev
 ```
 
 ---
 
-## 📱 Responsividad y Accesibilidad
+## 🔐 Usuarios de Prueba (Seed)
 
-- **Desktop**: Barra lateral expandida, tablas completas y gráficos amplios.
-- **Tablet**: Barra lateral compacta con tooltips y cuadrículas optimizadas.
-- **Mobile**: Barra de navegación inferior con botón flotante central de registro rápido `(+)`.
-- **Accesibilidad**: Botones semánticos, contrastes verificados, compatibilidad con navegación por teclado y soporte completo de Dark Mode.
+- **👤 Usuario Estándar**:
+  - Email: `jesus@finova.app`
+  - Contraseña: `password123`
+- **🛡️ Administrador Finova**:
+  - Email: `admin@finova.app`
+  - Contraseña: `admin123`
 
 ---
 
