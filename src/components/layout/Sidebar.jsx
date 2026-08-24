@@ -24,7 +24,7 @@ import { clsx } from 'clsx';
 
 export function Sidebar({ collapsed, setCollapsed }) {
   const { user, profile, isAdmin, logout, isDemoMode, loginAsDemoUser, loginAsDemoAdmin } = useAuth();
-  const { isDark, setTheme } = useTheme();
+  const { isDark, toggleTheme } = useTheme();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -161,7 +161,7 @@ export function Sidebar({ collapsed, setCollapsed }) {
           {!collapsed && <span>Apariencia</span>}
           <button
             type="button"
-            onClick={() => setTheme(isDark ? 'light' : 'dark')}
+            onClick={toggleTheme}
             className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors ml-auto"
             title="Cambiar tema"
           >

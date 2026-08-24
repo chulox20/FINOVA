@@ -11,12 +11,32 @@ export function ThemeProvider({ children }) {
     }
   });
 
+  const [systemIsDark, setSystemIsDark] = useState(() => {
+    try {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    } catch {
+      return true;
+    }
+  });
+
+  // Listen to system theme preference changes
+  useEffect(() => {
+    try {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      const handleChange = (e) => {
+        setSystemIsDark(e.matches);
+      };
+      mediaQuery.addEventListener('change', handleChange);
+      return () => mediaQuery.removeEventListener('change', handleChange);
+    } catch (err) {
+      console.warn('Media query listener error:', err);
+    }
+  }, []);
+
+  const isDark = theme === 'dark' || (theme === 'system' && systemIsDark);
+
   useEffect(() => {
     const root = document.documentElement;
-    const isDark =
-      theme === 'dark' ||
-      (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-
     if (isDark) {
       root.classList.add('dark');
     } else {
@@ -28,25 +48,14 @@ export function ThemeProvider({ children }) {
     } catch (err) {
       console.warn('LocalStorage theme error:', err);
     }
-  }, [theme]);
+  }, [theme, isDark]);
 
-  // Listen to system changes if in system mode
-  useEffect(() => {
-    if (theme !== 'system') return;
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleChange = () => {
-      if (mediaQuery.matches) {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-      }
-    };
-    mediaQuery.addEventListener('change', handleChange);
-    return () => mediaQuery.removeEventListener('change', handleChange);
-  }, [theme]);
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  };
 
   return (
-    <ThemeContext.Provider value={{ theme, setTheme, isDark: document.documentElement.classList.contains('dark') }}>
+    <ThemeContext.Provider value={{ theme, setTheme, isDark, toggleTheme }}>
       {children}
     </ThemeContext.Provider>
   );
