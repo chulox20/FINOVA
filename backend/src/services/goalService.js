@@ -39,21 +39,19 @@ export const goalService = {
   },
 
   /**
-   * Create a new goal
+   * Create a new goal (Initial current_amount is always strictly 0.00; funding only through contributions)
    */
   async createGoal(userId, data) {
     const targetAmount = Number(data.target_amount);
-    const currentAmount = Number(data.current_amount || 0);
 
     const res = await query(
       `INSERT INTO goals (user_id, name, target_amount, current_amount, deadline, account_id, color, icon, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       VALUES ($1, $2, $3, 0.00, $4, $5, $6, $7, $8)
        RETURNING *`,
       [
         userId,
         data.name,
         targetAmount,
-        currentAmount,
         data.deadline || null,
         data.account_id || null,
         data.color || '#10b981',
@@ -65,16 +63,16 @@ export const goalService = {
     return {
       ...res.rows[0],
       target_amount: Number(res.rows[0].target_amount),
-      current_amount: Number(res.rows[0].current_amount),
+      current_amount: 0,
       goal_contributions: [],
     };
   },
 
   /**
-   * Update goal
+   * Update goal metadata (current_amount is only modified via atomic contributions)
    */
   async updateGoal(userId, goalId, updates) {
-    const allowed = ['name', 'target_amount', 'current_amount', 'deadline', 'account_id', 'color', 'icon', 'status'];
+    const allowed = ['name', 'target_amount', 'deadline', 'account_id', 'color', 'icon', 'status'];
     const keys = Object.keys(updates).filter(k => allowed.includes(k));
 
     if (keys.length === 0) {
@@ -120,7 +118,7 @@ export const goalService = {
   },
 
   /**
-   * Atomic Add Goal Contribution (Section 21: Goal + $250, Account - $250, Transaction record, inside BEGIN ... COMMIT)
+   * Atomic Add Goal Contribution (Section 21: Mandatory Account Debit + Transaction + Goal increment in single ACID transaction)
    */
   async addContribution(userId, goalId, data) {
     const numAmount = Number(data.amount);
@@ -143,8 +141,57 @@ export const goalService = {
       }
       const goal = goalRes.rows[0];
 
-      // 2. Insert contribution
+      // 2. Resolve funding account (mandatory)
+      const fundingAccountId = data.account_id || goal.account_id;
+      if (!fundingAccountId) {
+        const err = new Error('Debes seleccionar una cuenta bancaria de origen para fondear el aporte');
+        err.statusCode = 400;
+        throw err;
+      }
+
+      // 3. Lock and verify funding account
+      const accRes = await client.query(
+        'SELECT id, name, type, balance::numeric FROM accounts WHERE id = $1 AND user_id = $2 FOR UPDATE',
+        [fundingAccountId, userId]
+      );
+      if (accRes.rows.length === 0) {
+        const err = new Error('La cuenta bancaria para el aporte no existe o no pertenece al usuario');
+        err.statusCode = 404;
+        throw err;
+      }
+      const fundingAcc = accRes.rows[0];
+
+      // 4. Validate sufficient funds on non-credit account
+      if (fundingAcc.type !== 'credit_card' && Number(fundingAcc.balance) < numAmount) {
+        const err = new Error(
+          `Fondos insuficientes en la cuenta "${fundingAcc.name}". Saldo disponible: $${Number(fundingAcc.balance).toFixed(2)}`
+        );
+        err.statusCode = 400;
+        throw err;
+      }
+
+      // 5. Deduct from account balance
+      await client.query(
+        'UPDATE accounts SET balance = balance - $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+        [numAmount, fundingAccountId]
+      );
+
+      // 6. Record financial movement in transactions table
       const contribDate = data.contribution_date || new Date().toISOString().split('T')[0];
+      await client.query(
+        `INSERT INTO transactions (user_id, account_id, type, description, amount, transaction_date, notes)
+         VALUES ($1, $2, 'expense', $3, $4, $5, $6)`,
+        [
+          userId,
+          fundingAccountId,
+          `Aporte a meta: ${goal.name}`,
+          numAmount,
+          contribDate,
+          data.note || `Aporte financiero a meta "${goal.name}"`,
+        ]
+      );
+
+      // 7. Insert contribution record
       const contribRes = await client.query(
         `INSERT INTO goal_contributions (goal_id, user_id, amount, contribution_date, note)
          VALUES ($1, $2, $3, $4, $5)
@@ -152,7 +199,7 @@ export const goalService = {
         [goalId, userId, numAmount, contribDate, data.note || `Aporte para ${goal.name}`]
       );
 
-      // 3. Update goal current_amount
+      // 8. Update goal current_amount and status
       const newCurrent = Number(goal.current_amount) + numAmount;
       const isCompleted = newCurrent >= Number(goal.target_amount);
       const newStatus = isCompleted ? 'completed' : goal.status;
@@ -164,39 +211,10 @@ export const goalService = {
         [newCurrent, newStatus, goalId]
       );
 
-      // 4. If account is specified, deduct amount and create transaction record
-      const fundingAccountId = data.account_id || goal.account_id;
-      if (fundingAccountId) {
-        const accRes = await client.query(
-          'SELECT id, name FROM accounts WHERE id = $1 AND user_id = $2 FOR UPDATE',
-          [fundingAccountId, userId]
-        );
-        if (accRes.rows.length > 0) {
-          // Deduct from account balance
-          await client.query(
-            'UPDATE accounts SET balance = balance - $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-            [numAmount, fundingAccountId]
-          );
-
-          // Record movement
-          await client.query(
-            `INSERT INTO transactions (user_id, account_id, type, description, amount, transaction_date, notes)
-             VALUES ($1, $2, 'expense', $3, $4, $5, $6)`,
-            [
-              userId,
-              fundingAccountId,
-              `Aporte a meta: ${goal.name}`,
-              numAmount,
-              contribDate,
-              data.note || 'Transferido a meta de ahorro',
-            ]
-          );
-        }
-      }
-
       return {
         contribution: { ...contribRes.rows[0], amount: numAmount },
         goal: { ...goal, current_amount: newCurrent, status: newStatus },
+        account: { id: fundingAccountId, newBalance: Number(fundingAcc.balance) - numAmount },
       };
     });
   }

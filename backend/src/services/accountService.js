@@ -57,10 +57,10 @@ export const accountService = {
   },
 
   /**
-   * Update an account
+   * Update an account metadata (balance is strictly immutable here; only modified via transactions)
    */
   async updateAccount(userId, accountId, updates) {
-    const allowed = ['name', 'type', 'balance', 'currency', 'color', 'icon'];
+    const allowed = ['name', 'type', 'currency', 'color', 'icon'];
     const keys = Object.keys(updates).filter(k => allowed.includes(k));
 
     if (keys.length === 0) return this.getAccountById(userId, accountId);
@@ -104,7 +104,7 @@ export const accountService = {
   },
 
   /**
-   * Atomic Funds Transfer (Section 20: BEGIN ... Cuenta A - $500 ... Cuenta B + $500 ... INSERT transfer tx ... COMMIT)
+   * Atomic Funds Transfer with deterministic lock ordering (prevents deadlocks) and balance check
    */
   async transferFunds(userId, { fromAccountId, toAccountId, amount, description, date, notes }) {
     const numAmount = Number(amount);
@@ -115,44 +115,51 @@ export const accountService = {
     }
 
     return await withTransaction(async (client) => {
-      // 1. Lock and check source account
-      const fromRes = await client.query(
-        'SELECT id, name, balance::numeric FROM accounts WHERE id = $1 AND user_id = $2 FOR UPDATE',
-        [fromAccountId, userId]
+      // Deterministic lock acquisition order (prevents concurrent deadlocks A->B & B->A)
+      const [firstLockId, secondLockId] = fromAccountId < toAccountId
+        ? [fromAccountId, toAccountId]
+        : [toAccountId, fromAccountId];
+
+      const lock1Res = await client.query(
+        'SELECT id, name, type, balance::numeric FROM accounts WHERE id = $1 AND user_id = $2 FOR UPDATE',
+        [firstLockId, userId]
       );
-      if (fromRes.rows.length === 0) {
-        const err = new Error('Cuenta de origen no encontrada');
+      const lock2Res = await client.query(
+        'SELECT id, name, type, balance::numeric FROM accounts WHERE id = $1 AND user_id = $2 FOR UPDATE',
+        [secondLockId, userId]
+      );
+
+      if (lock1Res.rows.length === 0 || lock2Res.rows.length === 0) {
+        const err = new Error('Una o ambas cuentas no fueron encontradas o no pertenecen al usuario');
         err.statusCode = 404;
         throw err;
       }
 
-      // 2. Lock and check destination account
-      const toRes = await client.query(
-        'SELECT id, name, balance::numeric FROM accounts WHERE id = $1 AND user_id = $2 FOR UPDATE',
-        [toAccountId, userId]
-      );
-      if (toRes.rows.length === 0) {
-        const err = new Error('Cuenta de destino no encontrada');
-        err.statusCode = 404;
+      const fromAcc = fromAccountId === firstLockId ? lock1Res.rows[0] : lock2Res.rows[0];
+      const toAcc = toAccountId === firstLockId ? lock1Res.rows[0] : lock2Res.rows[0];
+
+      // Validate sufficient funds for non-credit accounts
+      if (fromAcc.type !== 'credit_card' && Number(fromAcc.balance) < numAmount) {
+        const err = new Error(
+          `Fondos insuficientes en la cuenta "${fromAcc.name}". Saldo disponible: $${Number(fromAcc.balance).toFixed(2)}`
+        );
+        err.statusCode = 400;
         throw err;
       }
 
-      const fromAcc = fromRes.rows[0];
-      const toAcc = toRes.rows[0];
-
-      // 3. Deduct from source account
+      // Deduct from source account
       await client.query(
         'UPDATE accounts SET balance = balance - $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
         [numAmount, fromAccountId]
       );
 
-      // 4. Credit destination account
+      // Credit destination account
       await client.query(
         'UPDATE accounts SET balance = balance + $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
         [numAmount, toAccountId]
       );
 
-      // 5. Create transfer transaction record
+      // Create transfer transaction record
       const txDate = date || new Date().toISOString().split('T')[0];
       const txDesc = description || `Transferencia de ${fromAcc.name} a ${toAcc.name}`;
 

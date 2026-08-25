@@ -13,13 +13,13 @@ import { getCurrentISODate } from '../../utils/date';
 
 const contributionSchema = z.object({
   amount: z.coerce.number().positive('El monto a aportar debe ser mayor a cero'),
-  accountId: z.string().optional(),
+  accountId: z.string().min(1, 'Debes seleccionar una cuenta de origen para fondear el ahorro'),
   date: z.string().min(1, 'La fecha es obligatoria'),
   note: z.string().optional(),
 });
 
 export function ContributionModal({ isOpen, onClose, goal }) {
-  const { accounts, contributeGoal, currency, formatMoney } = useFinance();
+  const { accounts, addGoalContribution, contributeGoal, currency, formatMoney } = useFinance();
 
   const {
     register,
@@ -39,12 +39,12 @@ export function ContributionModal({ isOpen, onClose, goal }) {
   const onSubmit = async (values) => {
     if (!goal) return;
     try {
-      await contributeGoal({
-        goalId: goal.id,
-        amount: values.amount,
-        accountId: values.accountId || null,
+      const fn = addGoalContribution || contributeGoal;
+      await fn(goal.id, {
+        amount: Number(values.amount),
+        account_id: values.accountId,
+        contribution_date: values.date,
         note: values.note,
-        date: values.date,
       });
 
       // If this contribution completes the goal, launch confetti!
@@ -100,12 +100,12 @@ export function ContributionModal({ isOpen, onClose, goal }) {
         />
 
         <Select
-          label="Debitar de la cuenta (Opcional)"
+          label="Debitar de la cuenta (Obligatorio)"
           leftIcon={<Wallet className="w-4 h-4" />}
           error={errors.accountId?.message}
+          required
           {...register('accountId')}
         >
-          <option value="">No descontar de ninguna cuenta</option>
           {accounts.map(a => (
             <option key={a.id} value={a.id}>
               {a.name} ({formatMoney(a.balance)})

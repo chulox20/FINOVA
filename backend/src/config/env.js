@@ -10,6 +10,10 @@ const envSchema = z.object({
   JWT_EXPIRES_IN: z.string().default('7d'),
   FRONTEND_URL: z.string().default('http://localhost:5173'),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  ENABLE_MEMORY_FALLBACK: z.preprocess(
+    (val) => val === 'true' || val === true,
+    z.boolean().default(false)
+  ),
 });
 
 const parsed = envSchema.safeParse(process.env);

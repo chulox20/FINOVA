@@ -82,7 +82,7 @@ export const transactionService = {
   },
 
   /**
-   * Atomic Create Transaction (Section 17: BEGIN -> INSERT tx -> UPDATE account.balance -> COMMIT)
+   * Atomic Create Transaction with balance verification (Section 17: BEGIN -> INSERT tx -> UPDATE account.balance -> COMMIT)
    */
   async createTransaction(userId, data) {
     const numAmount = Number(data.amount);
@@ -93,9 +93,9 @@ export const transactionService = {
     }
 
     return await withTransaction(async (client) => {
-      // 1. Verify account ownership
+      // 1. Verify and lock source account
       const accRes = await client.query(
-        'SELECT id, name, balance::numeric FROM accounts WHERE id = $1 AND user_id = $2 FOR UPDATE',
+        'SELECT id, name, type, balance::numeric FROM accounts WHERE id = $1 AND user_id = $2 FOR UPDATE',
         [data.account_id, userId]
       );
       if (accRes.rows.length === 0) {
@@ -103,8 +103,20 @@ export const transactionService = {
         err.statusCode = 404;
         throw err;
       }
+      const sourceAcc = accRes.rows[0];
 
-      // 2. If transfer, verify to_account
+      // 2. If transfer or expense, verify sufficient funds on non-credit accounts
+      if ((data.type === 'expense' || data.type === 'transfer') && sourceAcc.type !== 'credit_card') {
+        if (Number(sourceAcc.balance) < numAmount) {
+          const err = new Error(
+            `Fondos insuficientes en la cuenta "${sourceAcc.name}". Saldo disponible: $${Number(sourceAcc.balance).toFixed(2)}`
+          );
+          err.statusCode = 400;
+          throw err;
+        }
+      }
+
+      // 3. If transfer, verify destination account
       if (data.type === 'transfer') {
         if (!data.to_account_id) {
           const err = new Error('Las transferencias requieren una cuenta de destino');
@@ -116,13 +128,13 @@ export const transactionService = {
           [data.to_account_id, userId]
         );
         if (toRes.rows.length === 0) {
-          const err = new Error('Cuenta de destino no encontrada');
+          const err = new Error('Cuenta de destino no encontrada o no pertenece al usuario');
           err.statusCode = 404;
           throw err;
         }
       }
 
-      // 3. Insert transaction
+      // 4. Insert transaction
       const txRes = await client.query(
         `INSERT INTO transactions (user_id, account_id, to_account_id, category_id, type, description, amount, transaction_date, notes)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
@@ -140,7 +152,7 @@ export const transactionService = {
         ]
       );
 
-      // 4. Update account balances
+      // 5. Update account balances
       if (data.type === 'expense') {
         await client.query('UPDATE accounts SET balance = balance - $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [numAmount, data.account_id]);
       } else if (data.type === 'income') {
@@ -174,7 +186,7 @@ export const transactionService = {
   },
 
   /**
-   * Atomic Update Transaction (Section 18: Revert old impact + apply new impact in single DB transaction)
+   * Atomic Update Transaction (Section 18: Revert old impact + apply new impact in single DB transaction with ownership & balance checks)
    */
   async updateTransaction(userId, transactionId, updates) {
     return await withTransaction(async (client) => {
@@ -191,7 +203,7 @@ export const transactionService = {
       const oldTx = oldTxRes.rows[0];
       const oldAmount = Number(oldTx.amount);
 
-      // 2. Revert old balance impact
+      // 2. Revert old balance impact first
       if (oldTx.type === 'expense') {
         await client.query('UPDATE accounts SET balance = balance + $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [oldAmount, oldTx.account_id]);
       } else if (oldTx.type === 'income') {
@@ -203,7 +215,7 @@ export const transactionService = {
         }
       }
 
-      // 3. Merge updates
+      // 3. Resolve target accounts & validate ownership
       const newAccountId = updates.account_id || oldTx.account_id;
       const newToAccountId = updates.to_account_id !== undefined ? updates.to_account_id : oldTx.to_account_id;
       const newCategoryId = updates.category_id !== undefined ? updates.category_id : oldTx.category_id;
@@ -212,6 +224,47 @@ export const transactionService = {
       const newAmount = updates.amount !== undefined ? Number(updates.amount) : oldAmount;
       const newDate = updates.transaction_date || oldTx.transaction_date;
       const newNotes = updates.notes !== undefined ? updates.notes : oldTx.notes;
+
+      // Validate new primary account belongs to user
+      const accRes = await client.query(
+        'SELECT id, name, type, balance::numeric FROM accounts WHERE id = $1 AND user_id = $2 FOR UPDATE',
+        [newAccountId, userId]
+      );
+      if (accRes.rows.length === 0) {
+        const err = new Error('La cuenta seleccionada no existe o no pertenece al usuario');
+        err.statusCode = 404;
+        throw err;
+      }
+      const targetAcc = accRes.rows[0];
+
+      // Validate sufficient funds on non-credit accounts after reversion
+      if ((newType === 'expense' || newType === 'transfer') && targetAcc.type !== 'credit_card') {
+        if (Number(targetAcc.balance) < newAmount) {
+          const err = new Error(
+            `Fondos insuficientes en la cuenta "${targetAcc.name}". Saldo disponible: $${Number(targetAcc.balance).toFixed(2)}`
+          );
+          err.statusCode = 400;
+          throw err;
+        }
+      }
+
+      // Validate destination account if transfer
+      if (newType === 'transfer') {
+        if (!newToAccountId) {
+          const err = new Error('Las transferencias requieren una cuenta de destino');
+          err.statusCode = 400;
+          throw err;
+        }
+        const toRes = await client.query(
+          'SELECT id, name, balance::numeric FROM accounts WHERE id = $1 AND user_id = $2 FOR UPDATE',
+          [newToAccountId, userId]
+        );
+        if (toRes.rows.length === 0) {
+          const err = new Error('La cuenta de destino no existe o no pertenece al usuario');
+          err.statusCode = 404;
+          throw err;
+        }
+      }
 
       // 4. Apply new balance impact
       if (newType === 'expense') {

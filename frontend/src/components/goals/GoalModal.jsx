@@ -12,7 +12,6 @@ import { Target, Wallet, Calendar, Palette } from 'lucide-react';
 const goalSchema = z.object({
   name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres'),
   target_amount: z.coerce.number().positive('El objetivo debe ser mayor a cero'),
-  current_amount: z.coerce.number().min(0, 'El monto inicial no puede ser negativo').default(0),
   deadline: z.string().optional(),
   account_id: z.string().optional(),
   color: z.string().default('#10b981'),
@@ -22,7 +21,7 @@ const goalSchema = z.object({
 const PRESET_COLORS = ['#10b981', '#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#06b6d4', '#14b8a6', '#f43f5e'];
 
 export function GoalModal({ isOpen, onClose, initialData = null }) {
-  const { accounts, addGoal, editGoal, currency } = useFinance();
+  const { accounts, addGoal, updateGoal, editGoal, currency } = useFinance();
 
   const {
     register,
@@ -36,7 +35,6 @@ export function GoalModal({ isOpen, onClose, initialData = null }) {
     defaultValues: {
       name: '',
       target_amount: '',
-      current_amount: 0,
       deadline: '',
       account_id: '',
       color: '#10b981',
@@ -51,7 +49,6 @@ export function GoalModal({ isOpen, onClose, initialData = null }) {
       reset({
         name: initialData.name || '',
         target_amount: initialData.target_amount || '',
-        current_amount: initialData.current_amount || 0,
         deadline: initialData.deadline || '',
         account_id: initialData.account_id || '',
         color: initialData.color || '#10b981',
@@ -61,7 +58,6 @@ export function GoalModal({ isOpen, onClose, initialData = null }) {
       reset({
         name: '',
         target_amount: '',
-        current_amount: 0,
         deadline: '',
         account_id: '',
         color: '#10b981',
@@ -72,8 +68,9 @@ export function GoalModal({ isOpen, onClose, initialData = null }) {
 
   const onSubmit = async (values) => {
     try {
+      const updateFn = updateGoal || editGoal;
       if (initialData?.id) {
-        await editGoal(initialData.id, values);
+        await updateFn(initialData.id, values);
       } else {
         await addGoal(values);
       }
@@ -101,28 +98,16 @@ export function GoalModal({ isOpen, onClose, initialData = null }) {
           {...register('name')}
         />
 
-        <div className="grid grid-cols-2 gap-3">
-          <Input
-            label="Monto Objetivo"
-            type="number"
-            step="0.01"
-            placeholder="0.00"
-            prefix={currency === 'USD' ? '$' : currency === 'EUR' ? '€' : 'Bs.'}
-            required
-            error={errors.target_amount?.message}
-            {...register('target_amount')}
-          />
-
-          <Input
-            label="Ahorro Inicial (opcional)"
-            type="number"
-            step="0.01"
-            placeholder="0.00"
-            prefix={currency === 'USD' ? '$' : currency === 'EUR' ? '€' : 'Bs.'}
-            error={errors.current_amount?.message}
-            {...register('current_amount')}
-          />
-        </div>
+        <Input
+          label="Monto Objetivo"
+          type="number"
+          step="0.01"
+          placeholder="0.00"
+          prefix={currency === 'USD' ? '$' : currency === 'EUR' ? '€' : 'Bs.'}
+          required
+          error={errors.target_amount?.message}
+          {...register('target_amount')}
+        />
 
         <div className="grid grid-cols-2 gap-3">
           <Input
@@ -134,7 +119,7 @@ export function GoalModal({ isOpen, onClose, initialData = null }) {
           />
 
           <Select
-            label="Cuenta Asociada"
+            label="Cuenta Asociada (Opcional)"
             leftIcon={<Wallet className="w-4 h-4" />}
             error={errors.account_id?.message}
             {...register('account_id')}
@@ -150,7 +135,7 @@ export function GoalModal({ isOpen, onClose, initialData = null }) {
 
         {/* Color Palette Selector */}
         <div>
-          <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 block flex items-center gap-1.5">
+          <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
             <Palette className="w-3.5 h-3.5" />
             <span>Color Distintivo</span>
           </label>
