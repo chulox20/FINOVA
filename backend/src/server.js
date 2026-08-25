@@ -54,12 +54,14 @@ app.use((req, res) => {
 // Centralized Error Handler
 app.use(errorHandler);
 
-// Start listening
-const server = app.listen(env.PORT, () => {
-  console.log(`\n💎 FINOVA Backend REST API activo en: http://localhost:${env.PORT}`);
-  console.log(`🚀 Entorno: ${env.NODE_ENV}`);
-  console.log(`🔗 API Base: http://localhost:${env.PORT}/api`);
-  console.log(`🛡️ Rate Limiting y autenticación JWT activos.\n`);
-});
+// Start listening (only when not in Vercel serverless environment)
+if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
+  app.listen(env.PORT, () => {
+    console.log(`\n💎 FINOVA Backend REST API activo en: http://localhost:${env.PORT}`);
+    console.log(`🚀 Entorno: ${env.NODE_ENV}`);
+    console.log(`🔗 API Base: http://localhost:${env.PORT}/api`);
+    console.log(`🛡️ Rate Limiting y autenticación JWT activos.\n`);
+  });
+}
 
 export default app;

@@ -3,7 +3,7 @@
  * Handles JWT injection, JSON serialization, errors, and standard responses.
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:4000/api');
 
 class ApiClient {
   constructor(baseUrl) {
